@@ -1,4 +1,33 @@
-# Update/-grade node
+# Motivation
+Vor dem Laden bis dato immer auf Auswertung von Sonnen geguckt - wesentliches fehlte da: Wieviel aus dem Netz gezogen wird, wieviel eingespeist wird, wieviel an die Wallbox geht etc.
+Und der Snapshot in evcc über Produktion/Verbrauch in View EnergyFlow unterstützt Entscheidungen ob und wieviel Laden nur bedingt.
+Ein Verlauf erleichtert die Abschätzung wann und wieviel geladen werden kann:
+  * wann ungefähr ist die Batterie voll?
+  * Wie lange ungefähr liefert die PV Anlage noch genug Leistung?
+  * ab wann ungefähr gibt es genug Leistung von der PV Anlage?
+  * mit welcher Leistung der PV Anlage kann man ungefähr wann rechnen?
+# Umsetzung
+
+`site.go` ist der zentrale Ansatzpunkt: 
+* Dort wird gemessen, wieviel produziert und verbraucht wird - und zwar von der zu Grunde liegenden Hardware unabhängig.
+* diese Snapshots werden in einer neuen Tabelle abgelegt in der SQLite:
+  * minütlich = 1440 datensätze am Tag mit max. 1KB Size in der DB = 1,4 MB/Tag = 513 MB/Jahr = 5 GB/10 Jahren
+  * Reines Datenvolumen = max. 100 Byte = max. 140 KB die an ein Chart in einem View gepusehd werden müssen. 
+  * GO ORM legt die Tabelle automatisch an.
+* neuer REST Endpunkt, mit dem man die Daten für einen Tag als JSON laden kann (ggf. andere Charts/Auswertungen)
+* von `site.go` werden auch die View's mit aktuellen Daten versorgt, d.h. Daten für ein Chart das in einem View angezeigt wird, propagiert/pushed man am besten dort.
+* Neuer View mit chart.js chart in EnergyFlow, das oberhalb von den Produktions/Verbrauchsdaten angezeigt wird und zusammen mit diesen ein/ausgeklappt werden kann.
+
+# ToDo's
+
+- Übersetzungen fehlen
+- Datenbank sollte regelmäßig bereinigt werden: Entweder kummulieren bzw. Statistik oder löschen? Oder neuer Endpunkt für Housekeeping?
+- Neuer REST Endpunkt für Ausgabe Tagesdaten wirklich nötig?
+- Wettervorhersage - evtl. erwartete Sonnenstunden?
+- Anzeige andere Tage? Wochen-/Monats-/Jahresübersicht?
+- Legende rechts vom chart? Als Tabelle mit summierten Tageswerten?
+# HowTo's
+## Update/-grade node
 
 [Update node.js](https://stackoverflow.com/questions/8191459/how-do-i-update-node-js)
 
@@ -30,19 +59,19 @@ Aktuelle Version unter https://nodejs.org
 npm install xxxx
 ```
 
-# Wenn `make ui` failed ...
+## Wenn `make ui` failed ...
 
 Meistens alte Import-Abhängigkeiten, mit `npm install xxx lösbar`
 
-# Start evcc
+## Start evcc
 
-## SQLite nicht mehr als Parameter oder in Config YAML
+### SQLite nicht mehr als Parameter oder in Config YAML
 
 ```
 EVCC_DATABASE_DSN=./evcc.db ./evcc --config evcc.yaml
 ```
 
-# SQLite 
+## SQLite 
 
 [Download Übersicht](https://sqlitebrowser.org/dl/)
 
@@ -63,18 +92,18 @@ sudo apt install sqlite3
 
 [CLI](https://sqlite.org/cli.html)
 
-# GO ORM 
+## GO ORM 
 
 https://gorm.io/docs/connecting_to_the_database.html
 https://gorm.io/docs/query.html
 
-# GO Language Reference
+## GO Language Reference
 
 https://go.dev/ref/spec
 
 ['main' Funktion](https://stackoverflow.com/questions/42333488/package-main-and-func-main)
 
-# Debug GO in VCode
+## Debug GO in VCode
 
 https://github.com/golang/vscode-go/wiki/debugging
 
@@ -97,7 +126,7 @@ Statt `"${fileDirname}"` auch `main.go`
     ]
 }
 ```
-# Chart.js
+## Chart.js
 
 https://github.com/chartjs/Chart.js
 
@@ -137,21 +166,9 @@ https://rgbcolorcode.com/color/004D0D
 
 grep "^2023-03-10T" statistics.csv | tr ',' ' ' | while read line; do echo "${line} $(grep "$(echo "${line}" | cut -d' ' -f1)" measurements.csv | cut -d',' -f8)"; done |  awk '{printf("addData([\"%s\", %s, %s, %s, %s, %s, %s, %s, %s, %s]);\n", $1, $2, $5, $7, $6, $4, $3, 0, 0, $8)}' 
 
-## SQLLite Export in data umwandeln
+### SQLLite Export in data umwandeln
 grep -v "^id" evcc.csv | tr ',' ' ' | cut -d ' ' -f2-99 | awk '{printf("addData([\"%s-%02d-%02dT%02d:%02d:00+01:00\",%d,%d,%d,%d,%d,%d,%d,%d,%d])\n",$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)}'
 
-# Repo & Branch
+## Repo & Branch
 
 https://github.com/evcc-io/evcc/
-
-Branch: 
-* master
-* feature/ETREL_INCH_HOME-patch
-
-# TODO
-
-* Zeiten:
-  * DONE: Zeit in DB = UTC? -> wenn nicht, sollte UTC sein.
-  * DONE: Zeit aus DB = UTC? -> wenn nicht, sollte UTC sein
-  * DONE: Zeit Anzeige = local time? -> sollte als UTC kommen und auf local time umgewandelt werden.
-  * Local Time 2023-04-27 00:00 bis 23:59 ist UTC früher! D.h. 
